@@ -1,0 +1,65 @@
+---
+# vim: ts=2:sw=2:sts=2:et:ft=yaml.ansible
+# Install Vagrant
+#
+########################################################################
+
+- name: Install Vagrant on localhost
+  block:
+
+  - name: Vagrant is installed
+    ansible.builtin.shell:
+      cmd: which vagrant || command -v vagrant
+    changed_when: false
+
+  rescue:
+
+  # Idempotence in the Homebrew module is broken, will fail if package
+  # is already installed.
+  - name: Attempt to install Vagrant with Homebrew
+    community.general.homebrew:
+      name: vagrant
+      state: latest
+    when: ansible_system == 'Darwin'
+
+  - name: Install Vagrant with generic package manager
+    ansible.builtin.package:
+      name: vagrant
+      state: present
+    become: yes
+    when: ansible_system != 'Darwin'
+
+- name: Install Vagrant boxes
+  ansible.builtin.shell:
+    cmd: "vagrant box add {{box_item}} --provider {{vagrant_provider}}"
+  register: install_vagrant_box
+  changed_when: install_vagrant_box['rc'] == 0
+  failed_when:
+  - install_vagrant_box['rc'] != 0
+  - not install_vagrant_box['stderr'] | regex_search('already exists')
+  loop: "{{vagrant_boxes}}"
+  loop_control:
+    loop_var: box_item
+  when: not ansible_check_mode
+
+- name: Vagrant boxes installed
+  ansible.builtin.shell:
+    cmd: vagrant box list
+  register: vagrant_box_list
+  changed_when: false
+  failed_when: not vagrant_box_list['stdout'] | regex_search(box_item)
+  loop: "{{vagrant_boxes}}"
+  loop_control:
+    loop_var: box_item
+
+- name: "Vagrantfile is {{vf}}"
+  ansible.builtin.set_fact:
+    vagrantfile: "{{vf}}"
+  vars:
+    vf: "{{vagrant_cwd}}/Vagrantfile"
+
+- name: Initialize Vagrantfile if it doesn't already exist
+  ansible.builtin.template:
+    src: Vagrantfile.j2
+    dest: "{{vagrantfile}}"
+    force: no

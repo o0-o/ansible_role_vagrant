@@ -1,0 +1,21 @@
+{# vim: ts=2:sw=2:sts=2:et:ft=jinja2
+
+Empty Vagrantfile template
+
+#}
+# vim: ts=2:sw=2:sts=2:et:ft=ruby
+
+Vagrant.configure(2) do |config|
+
+  # General Vagrant VM configuration
+  config.ssh.insert_key = false
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+{% if vagrant_provider | default('virtualbox') == 'virtualbox' %}
+  # VirtualBox configuration
+  config.vm.provider :virtualbox do |vb|
+    vb.linked_clone = true
+  end
+{% endif %}
+
+end
